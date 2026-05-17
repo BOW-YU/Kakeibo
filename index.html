@@ -575,31 +575,36 @@ function handleImportFile(e) {
 }
 
 function parseFullCsv(text) {
-  // Proper RFC-4180 CSV parser handling multi-line quoted fields
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
   const records = [];
-  let i = 0, fields = [], cur = '';
-  while (i <= text.length) {
+  let fields = [], cur = '', inQuote = false;
+  for (let i = 0; i <= text.length; i++) {
     const c = i < text.length ? text[i] : null;
-    if (cur === '' && c === '"') {
-      // quoted field
-      i++;
-      while (i < text.length) {
-        if (text[i] === '"' && text[i+1] === '"') { cur += '"'; i += 2; }
-        else if (text[i] === '"') { i++; break; }
-        else { cur += text[i++]; }
-      }
-    } else if (c === ',' || c === null || (c === '\r' && text[i+1] === '\n') || c === '\n') {
-      fields.push(cur.trim());
-      cur = '';
-      if (c === '\r') i++;
-      if (c === null || c === '\n' || text[i] === '\n') {
-        if (fields.some(f => f)) records.push(fields);
-        fields = [];
+    if (inQuote) {
+      if (c === '"') {
+        if (i + 1 < text.length && text[i+1] === '"') { cur += '"'; i++; }
+        else inQuote = false;
+      } else if (c === null) {
+        fields.push(cur); cur = '';
+        if (fields.some(f => f.trim())) records.push(fields);
+      } else {
+        cur += c;
       }
     } else {
-      cur += c;
+      if (c === '"') {
+        inQuote = true;
+      } else if (c === ',') {
+        fields.push(cur.trim()); cur = '';
+      } else if (c === '\r') {
+        // skip CR
+      } else if (c === '\n' || c === null) {
+        fields.push(cur.trim()); cur = '';
+        if (fields.some(f => f)) records.push(fields);
+        fields = [];
+      } else {
+        cur += c;
+      }
     }
-    i++;
   }
   return records;
 }
