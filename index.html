@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>記帳本</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
@@ -270,6 +271,31 @@ textarea { resize: none; height: 60px; line-height: 1.5; }
   text-align: center;
 }
 .edit-banner.show { display: block; }
+
+.imp-row {
+  background: var(--paper2); border-radius: var(--r);
+  padding: 10px 12px; margin-bottom: 8px;
+  border: 1px solid var(--line);
+}
+.imp-row.excluded { opacity: 0.4; }
+.imp-row-header {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 8px;
+}
+.imp-row-date { font-size: 12px; color: var(--ink3); font-family: 'DM Mono', monospace; }
+.imp-row-amt { font-size: 15px; font-family: 'DM Mono', monospace; font-weight: 400; }
+.imp-row-desc { font-size: 13px; color: var(--ink); margin-bottom: 8px; }
+.imp-row-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.imp-row-fields select, .imp-row-fields input {
+  font-size: 12px; padding: 5px 7px;
+}
+.imp-exclude-btn {
+  font-size: 11px; padding: 2px 8px;
+  border: 1px solid var(--line); border-radius: 4px;
+  background: none; cursor: pointer; color: var(--ink3);
+  font-family: 'Noto Serif TC', serif;
+}
+.imp-exclude-btn.active { background: var(--red-bg); color: var(--red); border-color: var(--red); }
 </style>
 </head>
 <body>
@@ -294,6 +320,7 @@ textarea { resize: none; height: 60px; line-height: 1.5; }
       <button class="tab-btn active" onclick="switchTab('add')">新增</button>
       <button class="tab-btn" onclick="switchTab('records')">明細</button>
       <button class="tab-btn" onclick="switchTab('stats')">統計</button>
+      <button class="tab-btn" onclick="switchTab('import')">匯入</button>
     </div>
   </div>
 </nav>
@@ -371,6 +398,41 @@ textarea { resize: none; height: 60px; line-height: 1.5; }
   <button class="submit-btn" onclick="addRecord()">記下來</button>
   <div style="display:flex;gap:8px;margin-top:10px;">
     <button onclick="loadAndRender()" style="flex:1;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:none;font-family:'Noto Serif TC',serif;font-size:13px;color:var(--ink2);cursor:pointer;">↻ 重新同步 Notion</button>
+  </div>
+</div>
+
+<!-- IMPORT PAGE -->
+<div id="page-import" class="page">
+  <p class="section-label" style="margin-bottom:12px;">銀行明細匯入</p>
+
+  <div class="zone" style="margin-bottom:12px;">
+    <div class="field-label" style="margin-bottom:6px;">選擇銀行</div>
+    <select id="imp-bank" onchange="updateImportHint()" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r);background:var(--paper2);font-family:'Noto Serif TC',serif;font-size:14px;color:var(--ink);outline:none;">
+      <option value="">請選擇銀行</option>
+      <option value="cathay">國泰銀行（CSV）</option>
+      <option value="sinopac">永豐銀行（CSV）</option>
+      <option value="ctbc">中信銀行（CSV）</option>
+      <option value="yuanta">元大銀行（CSV）</option>
+      <option value="taishin">台新銀行（XLSX）</option>
+    </select>
+    <div id="imp-hint" style="font-size:11px;color:var(--ink3);margin-top:6px;line-height:1.6;"></div>
+  </div>
+
+  <div class="zone" style="margin-bottom:12px;">
+    <div class="field-label" style="margin-bottom:6px;">上傳明細檔案</div>
+    <label style="display:block;padding:20px;border:1.5px dashed var(--line);border-radius:var(--r);text-align:center;cursor:pointer;background:var(--paper2);">
+      <div style="font-size:13px;color:var(--ink3);" id="imp-file-label">點此選擇檔案或拖曳至此</div>
+      <input type="file" id="imp-file" accept=".csv,.xlsx" onchange="handleImportFile(event)" style="display:none">
+    </label>
+  </div>
+
+  <div id="imp-preview" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <p class="section-label" style="margin:0;">預覽與調整</p>
+      <span id="imp-count" style="font-size:12px;color:var(--ink3);"></span>
+    </div>
+    <div id="imp-rows"></div>
+    <button onclick="batchImport()" style="width:100%;padding:14px;background:var(--ink);color:var(--paper);border:none;border-radius:var(--r);font-family:'Noto Serif TC',serif;font-size:15px;cursor:pointer;margin-top:12px;" id="imp-submit-btn">全部匯入 Notion</button>
   </div>
 </div>
 
@@ -452,6 +514,250 @@ function importData(e) {
   };
   reader.readAsText(file);
   e.target.value = '';
+}
+
+
+const BANK_CONFIGS = {
+  cathay: {
+    name: '國泰銀行', encoding: 'utf-8', type: 'csv', skipRows: 4,
+    dateCol: '交易日期', outCol: '提出', inCol: '存入', descCol: '說明', noteCol: '備註',
+    emptyVal: '−', dateFormat: 'slash', account: '國泰銀行'
+  },
+  sinopac: {
+    name: '永豐銀行', encoding: 'utf-8', type: 'csv', skipRows: 4,
+    dateCol: '交易日', outCol: '支出', inCol: '存入', descCol: '摘要', noteCol: '備註/資金用途',
+    emptyVal: '', dateFormat: 'slash', account: '永豐銀行'
+  },
+  ctbc: {
+    name: '中信銀行', encoding: 'big5', type: 'csv', skipRows: 3,
+    dateCol: '日期', outCol: '支出', inCol: '存入', descCol: '摘要', noteCol: '備註',
+    emptyVal: '', dateFormat: 'slash', account: '中信銀行'
+  },
+  yuanta: {
+    name: '元大銀行', encoding: 'big5', type: 'csv', skipRows: 0,
+    dateCol: '交易日期', outCol: '支出金額', inCol: '存入金額', descCol: '交易說明', noteCol: '備註',
+    emptyVal: '0', dateFormat: 'compact', account: '元大銀行'
+  },
+  taishin: {
+    name: '台新銀行', encoding: 'xlsx', type: 'xlsx', skipRows: 1,
+    dateCol: '交易日', amtCol: '金額', descCol: '摘要', noteCol: '備註',
+    dateFormat: 'slash', account: '台新銀行'
+  }
+};
+
+const BANK_HINTS = {
+  cathay: '從國泰世華網銀 → 帳戶查詢 → 存款明細 → 匯出CSV',
+  sinopac: '從永豐大戶網銀 → 帳戶查詢 → 往來明細 → 下載CSV',
+  ctbc: '從中信網銀 → 帳戶管理 → 活存明細 → 匯出CSV（注意：Big5編碼）',
+  yuanta: '從元大網銀 → 帳戶查詢 → 交易明細 → 下載CSV',
+  taishin: '從台新網銀 → 帳戶查詢 → 交易明細 → 下載Excel'
+};
+
+let importRows = [];
+
+function updateImportHint() {
+  const bank = document.getElementById('imp-bank').value;
+  document.getElementById('imp-hint').textContent = BANK_HINTS[bank] || '';
+}
+
+function handleImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const bank = document.getElementById('imp-bank').value;
+  if (!bank) { showToast('請先選擇銀行'); return; }
+  document.getElementById('imp-file-label').textContent = file.name;
+  const config = BANK_CONFIGS[bank];
+  if (config.type === 'xlsx') {
+    readXlsx(file, config);
+  } else {
+    readCsv(file, config);
+  }
+}
+
+function readCsv(file, config) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    let text = e.target.result;
+    const lines = text.split('\n');
+    const dataLines = lines.slice(config.skipRows).filter(l => l.trim() && !l.startsWith('提出') && !l.startsWith('存入') && !l.startsWith('"\n"') && !l.match(/^[",\s]*$/));
+    if (!dataLines.length) { showToast('找不到資料，請確認銀行選擇正確'); return; }
+    const headers = parseCsvLine(dataLines[0]);
+    const rows = [];
+    for (let i = 1; i < dataLines.length; i++) {
+      const vals = parseCsvLine(dataLines[i]);
+      if (vals.length < 3) continue;
+      const obj = {};
+      headers.forEach((h, idx) => obj[h.trim()] = (vals[idx] || '').trim());
+      const parsed = parseRow(obj, config);
+      if (parsed) rows.push(parsed);
+    }
+    importRows = rows;
+    renderImportPreview();
+  };
+  if (config.encoding === 'big5') {
+    reader.readAsText(file, 'big5');
+  } else {
+    reader.readAsText(file, 'utf-8');
+  }
+}
+
+function readXlsx(file, config) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+    const headers = json[config.skipRows];
+    const rows = [];
+    for (let i = config.skipRows + 1; i < json.length; i++) {
+      const vals = json[i];
+      if (!vals || !vals.length) continue;
+      const obj = {};
+      headers.forEach((h, idx) => obj[h] = vals[idx] || '');
+      const parsed = parseRow(obj, config);
+      if (parsed) rows.push(parsed);
+    }
+    importRows = rows;
+    renderImportPreview();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseCsvLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseRow(obj, config) {
+  let dateStr = (obj[config.dateCol] || '').trim();
+  if (!dateStr) return null;
+  // Normalize date
+  let date = '';
+  if (config.dateFormat === 'compact') {
+    // 20260511 → 2026-05-11
+    date = dateStr.substring(0,4) + '-' + dateStr.substring(4,6) + '-' + dateStr.substring(6,8);
+  } else {
+    // 2026/05/07... → 2026-05-07
+    date = dateStr.replace(/\s.*/, '').replace(/\//g, '-');
+    // Pad month/day: 2026-5-7 → 2026-05-07
+    const parts = date.split('-');
+    if (parts.length === 3) {
+      date = parts[0] + '-' + parts[1].padStart(2,'0') + '-' + parts[2].padStart(2,'0');
+    }
+  }
+  if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) return null;
+
+  let amount = 0, type = 'expense';
+  if (config.amtCol) {
+    // 台新: single amount column, positive=income, negative=expense
+    const raw = String(obj[config.amtCol] || '0').replace(/,/g,'').trim();
+    amount = parseFloat(raw) || 0;
+    if (amount > 0) type = 'income';
+    else if (amount < 0) { type = 'expense'; amount = Math.abs(amount); }
+    else return null;
+  } else {
+    const outRaw = String(obj[config.outCol] || '').replace(/,/g,'').trim();
+    const inRaw  = String(obj[config.inCol]  || '').replace(/,/g,'').trim();
+    const outAmt = (outRaw === config.emptyVal || outRaw === '' || outRaw === '−') ? 0 : parseFloat(outRaw) || 0;
+    const inAmt  = (inRaw  === config.emptyVal || inRaw  === '' || inRaw  === '−') ? 0 : parseFloat(inRaw)  || 0;
+    if (outAmt > 0) { amount = outAmt; type = 'expense'; }
+    else if (inAmt > 0) { amount = inAmt; type = 'income'; }
+    else return null;
+  }
+
+  const desc = (obj[config.descCol] || '').trim();
+  const note = (obj[config.noteCol] || '').trim();
+
+  // Auto-guess category
+  let category = type === 'income' ? '其他收入' : '其他支出';
+  const d = desc + note;
+  if (d.match(/薪|工資|工資|salary/i)) category = '薪資';
+  else if (d.match(/卡費|信用卡|card/i)) category = '貸款還款';
+  else if (d.match(/利息|存款息|interest/i)) category = type === 'income' ? '利息' : '其他支出';
+  else if (d.match(/轉帳|轉入|轉出|transfer/i)) category = type === 'income' ? '其他收入' : '其他支出';
+  else if (d.match(/保險|insurance/i)) category = '保險';
+  else if (d.match(/房貸|信貸|貸款|loan/i)) category = '貸款還款';
+
+  return { date, amount, type, category, account: config.account, cc: '', note: note || desc, desc, excluded: false };
+}
+
+function renderImportPreview() {
+  const container = document.getElementById('imp-rows');
+  document.getElementById('imp-preview').style.display = 'block';
+  document.getElementById('imp-count').textContent = importRows.length + ' 筆';
+
+  container.innerHTML = importRows.map((row, i) => {
+    const amtCol = row.type === 'income' ? 'var(--green)' : 'var(--red)';
+    const amtSign = row.type === 'income' ? '+' : '-';
+    return `<div class="imp-row ${row.excluded ? 'excluded' : ''}" id="imp-row-${i}">
+      <div class="imp-row-header">
+        <span class="imp-row-date">${row.date}</span>
+        <span class="imp-row-amt" style="color:${amtCol}">${amtSign}${row.amount.toLocaleString()}</span>
+        <button class="imp-exclude-btn ${row.excluded ? 'active' : ''}" onclick="toggleExclude(${i})">${row.excluded ? '已略過' : '略過'}</button>
+      </div>
+      <div class="imp-row-desc">${row.desc}${row.note && row.note !== row.desc ? ' · ' + row.note : ''}</div>
+      <div class="imp-row-fields">
+        <div>
+          <div class="field-label" style="margin-bottom:3px;">分類</div>
+          <select onchange="updateImportRow(${i},'category',this.value)">
+            ${(row.type==='income' ? ['薪資','副業（魚樂匯）','投資收益','利息','其他收入'] : ['餐飲','交通','購物','娛樂','醫療','保險','投資','房租','水電費','通訊','教育','貸款還款','其他支出']).map(c => `<option value="${c}" ${c===row.category?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div class="field-label" style="margin-bottom:3px;">帳戶</div>
+          <select onchange="updateImportRow(${i},'account',this.value)">
+            ${['永豐銀行','元大銀行','國泰銀行','中信銀行','台新銀行','LineBank','樂天銀行','現金'].map(a => `<option value="${a}" ${a===row.account?'selected':''}>${a}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleExclude(i) {
+  importRows[i].excluded = !importRows[i].excluded;
+  const rowEl = document.getElementById('imp-row-' + i);
+  rowEl.className = 'imp-row ' + (importRows[i].excluded ? 'excluded' : '');
+  rowEl.querySelector('.imp-exclude-btn').textContent = importRows[i].excluded ? '已略過' : '略過';
+  rowEl.querySelector('.imp-exclude-btn').className = 'imp-exclude-btn ' + (importRows[i].excluded ? 'active' : '');
+}
+
+function updateImportRow(i, field, val) {
+  importRows[i][field] = val;
+}
+
+async function batchImport() {
+  const toImport = importRows.filter(r => !r.excluded);
+  if (!toImport.length) { showToast('沒有可匯入的資料'); return; }
+  const btn = document.getElementById('imp-submit-btn');
+  btn.disabled = true;
+  let done = 0, failed = 0;
+  for (const row of toImport) {
+    btn.textContent = `匯入中 ${done+1}/${toImport.length}…`;
+    try {
+      const notionId = await saveToNotion({
+        type: row.type, amount: row.amount, category: row.category,
+        date: row.date, account: row.account, cc: row.cc,
+        note: row.note, accountTo: ''
+      });
+      records.unshift({ id: Date.now() + done, notionId, ...row });
+      done++;
+    } catch(e) { failed++; }
+    await new Promise(r => setTimeout(r, 350)); // rate limit
+  }
+  btn.disabled = false;
+  btn.textContent = '全部匯入 Notion';
+  showToast(`✓ 匯入完成 ${done} 筆${failed?'，失敗 '+failed+' 筆':''}`);
+  renderRecords(); renderStats();
 }
 
 function saveToken() {
