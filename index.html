@@ -499,7 +499,7 @@ async function saveToNotion(rec) {
   };
   if (rec.cc) props['信用卡'] = { select: { name: rec.cc } };
   if (rec.accountTo) props['轉入帳戶'] = { select: { name: rec.accountTo } };
-  const res = await fetch('https://api.notion.com/v1/pages', {
+  const res = await fetch('https://notion-proxy.bohuaue.workers.dev/v1/pages', {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer ' + NOTION_TOKEN,
@@ -514,7 +514,7 @@ async function saveToNotion(rec) {
 }
 
 async function deleteFromNotion(notionId) {
-  await fetch('https://api.notion.com/v1/pages/' + notionId, {
+  await fetch('https://notion-proxy.bohuaue.workers.dev/v1/pages/' + notionId, {
     method: 'PATCH',
     headers: {
       'Authorization': 'Bearer ' + NOTION_TOKEN,
@@ -530,7 +530,7 @@ async function loadFromNotion() {
   while (true) {
     const body = { page_size: 100, sorts: [{ property: '日期', direction: 'descending' }] };
     if (cursor) body.start_cursor = cursor;
-    const res = await fetch('https://api.notion.com/v1/databases/' + DATABASE_ID + '/query', {
+    const res = await fetch('https://notion-proxy.bohuaue.workers.dev/v1/databases/' + DATABASE_ID + '/query', {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + NOTION_TOKEN,
