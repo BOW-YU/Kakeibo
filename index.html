@@ -574,20 +574,55 @@ function handleImportFile(e) {
   }
 }
 
+function parseFullCsv(text) {
+  // Proper RFC-4180 CSV parser handling multi-line quoted fields
+  const records = [];
+  let i = 0, fields = [], cur = '';
+  while (i <= text.length) {
+    const c = i < text.length ? text[i] : null;
+    if (cur === '' && c === '"') {
+      // quoted field
+      i++;
+      while (i < text.length) {
+        if (text[i] === '"' && text[i+1] === '"') { cur += '"'; i += 2; }
+        else if (text[i] === '"') { i++; break; }
+        else { cur += text[i++]; }
+      }
+    } else if (c === ',' || c === null || (c === '\r' && text[i+1] === '\n') || c === '\n') {
+      fields.push(cur.trim());
+      cur = '';
+      if (c === '\r') i++;
+      if (c === null || c === '\n' || text[i] === '\n') {
+        if (fields.some(f => f)) records.push(fields);
+        fields = [];
+      }
+    } else {
+      cur += c;
+    }
+    i++;
+  }
+  return records;
+}
+
 function readCsv(file, config) {
   const reader = new FileReader();
   reader.onload = e => {
     let text = e.target.result;
-    const lines = text.split('\n');
-    const dataLines = lines.slice(config.skipRows).filter(l => l.trim() && !l.startsWith('提出') && !l.startsWith('存入') && !l.startsWith('"\n"') && !l.match(/^[",\s]*$/));
-    if (!dataLines.length) { showToast('找不到資料，請確認銀行選擇正確'); return; }
-    const headers = parseCsvLine(dataLines[0]);
+    // Remove BOM
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const records = parseFullCsv(text);
+    // Skip header rows
+    const dataRecords = records.slice(config.skipRows);
+    if (!dataRecords.length) { showToast('找不到資料，請確認銀行選擇正確'); return; }
+    const headers = dataRecords[0].map(h => h.trim());
     const rows = [];
-    for (let i = 1; i < dataLines.length; i++) {
-      const vals = parseCsvLine(dataLines[i]);
-      if (vals.length < 3) continue;
+    for (let i = 1; i < dataRecords.length; i++) {
+      const vals = dataRecords[i];
+      if (!vals || vals.length < 3) continue;
+      // Skip footer lines (合計 etc.)
+      if (vals[0].match(/提出|存入|總金額|合計/)) continue;
       const obj = {};
-      headers.forEach((h, idx) => obj[h.trim()] = (vals[idx] || '').trim());
+      headers.forEach((h, idx) => obj[h] = (vals[idx] || '').trim());
       const parsed = parseRow(obj, config);
       if (parsed) rows.push(parsed);
     }
