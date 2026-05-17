@@ -722,7 +722,7 @@ function parseRow(obj, config) {
   const d = desc + ' ' + note;
 
   // 跨行轉入/轉出、匯款、CD轉入 → 轉帳（資金調度，不是真正收支）
-  if (d.match(/跨行轉|跨行匯|CD轉入|ATM轉|行動轉入|行動轉出|網銀轉|手機轉|匯款/i)) {
+  if (d.match(/跨行轉|跨行匯|CD轉入|ATM轉|行動轉入|行動轉出|網銀轉|手機轉|匯款|轉帳存|轉帳提|大戶回饋/i)) {
     type = 'transfer';
     category = '轉帳';
   }
@@ -743,8 +743,9 @@ function renderImportPreview() {
   document.getElementById('imp-count').textContent = importRows.length + ' 筆';
 
   container.innerHTML = importRows.map((row, i) => {
-    const amtCol = row.type === 'income' ? 'var(--green)' : 'var(--red)';
-    const amtSign = row.type === 'income' ? '+' : '-';
+    const isTransfer = row.type === 'transfer';
+    const amtCol = isTransfer ? 'var(--blue)' : row.type === 'income' ? 'var(--green)' : 'var(--red)';
+    const amtSign = isTransfer ? '⇄ ' : row.type === 'income' ? '+' : '-';
     return `<div class="imp-row ${row.excluded ? 'excluded' : ''}" id="imp-row-${i}">
       <div class="imp-row-header">
         <span class="imp-row-date">${row.date}</span>
@@ -756,7 +757,7 @@ function renderImportPreview() {
         <div>
           <div class="field-label" style="margin-bottom:3px;">分類</div>
           <select onchange="updateImportRow(${i},'category',this.value)">
-            ${(row.type==='income' ? ['薪資','副業（魚樂匯）','投資收益','利息','其他收入'] : ['餐飲','交通','購物','娛樂','醫療','保險','投資','房租','水電費','通訊','教育','貸款還款','其他支出']).map(c => `<option value="${c}" ${c===row.category?'selected':''}>${c}</option>`).join('')}
+            ${(row.type==='income' ? ['薪資','副業（魚樂匯）','投資收益','利息','其他收入'] : row.type==='transfer' ? ['轉帳'] : ['餐飲','交通','購物','娛樂','醫療','保險','投資','房租','水電費','通訊','教育','貸款還款','其他支出']).map(c => `<option value="${c}" ${c===row.category?'selected':''}>${c}</option>`).join('')}
           </select>
         </div>
         <div>
