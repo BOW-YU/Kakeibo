@@ -728,7 +728,12 @@ function parseRow(obj, config) {
     category = '轉帳';
   }
   else if (d.match(/薪|工資|salary/i)) category = '薪資';
-  else if (d.match(/信用卡款|卡費扣繳|媒體轉帳.*卡費|帳單.*扣款/i)) {
+  else if (
+    d.match(/信用卡款|卡費扣繳|永豐卡費|國泰卡費|中信卡費|台新卡費|信用卡費|中信信用卡費|繳台新卡費|繳.*卡費/i) ||
+    d.match(/媒體轉帳/i) ||
+    d.match(/[０-９月]+卡費/u) ||
+    (d.match(/跨行轉|轉帳提|CD轉入|行動轉入/i) && d.match(/卡費|信用卡|帳單/i))
+  ) {
     // 銀行扣繳信用卡帳單 = 轉帳性質，標記為略過避免重複計算
     type = 'transfer'; category = '轉帳'; excluded = true;
   }
