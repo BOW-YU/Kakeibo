@@ -519,17 +519,17 @@ function importData(e) {
 
 const BANK_CONFIGS = {
   cathay: {
-    name: '國泰銀行', encoding: 'utf-8', type: 'csv', skipRows: 4,
+    name: '國泰銀行', encoding: 'utf-8', type: 'csv', skipRows: 2,
     dateCol: '交易日期', outCol: '提出', inCol: '存入', descCol: '說明', noteCol: '備註',
     emptyVal: '−', dateFormat: 'slash', account: '國泰銀行'
   },
   sinopac: {
-    name: '永豐銀行', encoding: 'utf-8', type: 'csv', skipRows: 4,
+    name: '永豐銀行', encoding: 'utf-8', type: 'csv', skipRows: 2,
     dateCol: '交易日', outCol: '支出', inCol: '存入', descCol: '摘要', noteCol: '備註/資金用途',
     emptyVal: '', dateFormat: 'slash', account: '永豐銀行'
   },
   ctbc: {
-    name: '中信銀行', encoding: 'big5', type: 'csv', skipRows: 3,
+    name: '中信銀行', encoding: 'big5', type: 'csv', skipRows: 2,
     dateCol: '日期', outCol: '支出', inCol: '存入', descCol: '摘要', noteCol: '備註',
     emptyVal: '', dateFormat: 'slash', account: '中信銀行'
   },
@@ -717,16 +717,23 @@ function parseRow(obj, config) {
   const desc = (obj[config.descCol] || '').trim();
   const note = (obj[config.noteCol] || '').trim();
 
-  // Auto-guess category
+  // Auto-guess category and type
   let category = type === 'income' ? '其他收入' : '其他支出';
-  const d = desc + note;
-  if (d.match(/薪|工資|工資|salary/i)) category = '薪資';
-  else if (d.match(/卡費|信用卡|card/i)) category = '貸款還款';
-  else if (d.match(/利息|存款息|interest/i)) category = type === 'income' ? '利息' : '其他支出';
-  else if (d.match(/轉帳|轉入|轉出|transfer/i)) category = type === 'income' ? '其他收入' : '其他支出';
-  else if (d.match(/保險|insurance/i)) category = '保險';
-  else if (d.match(/房貸|信貸|貸款|loan/i)) category = '貸款還款';
+  const d = desc + ' ' + note;
 
+  // 跨行轉入/轉出、匯款、CD轉入 → 轉帳（資金調度，不是真正收支）
+  if (d.match(/跨行轉|跨行匯|CD轉入|ATM轉|行動轉入|行動轉出|網銀轉|手機轉|匯款/i)) {
+    type = 'transfer';
+    category = '轉帳';
+  }
+  else if (d.match(/薪|工資|salary/i)) category = '薪資';
+  else if (d.match(/卡費|信用卡|card|媒體轉帳.*卡/i)) { type = 'expense'; category = '貸款還款'; }
+  else if (d.match(/利息|存款息|interest|回饋/i)) { type = 'income'; category = '利息'; }
+  else if (d.match(/保險|insurance/i)) { type = 'expense'; category = '保險'; }
+  else if (d.match(/房貸|信貸|貸款|loan/i)) { type = 'expense'; category = '貸款還款'; }
+  else if (d.match(/手續費/i)) { type = 'expense'; category = '其他支出'; }
+
+  // 轉帳類型不需要 accountTo 先留空，讓使用者自己補
   return { date, amount, type, category, account: config.account, cc: '', note: note || desc, desc, excluded: false };
 }
 
