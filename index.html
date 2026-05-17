@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>記帳本</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #1c1a17;
+  --ink2: #4a4740;
+  --ink3: #8a8780;
+  --paper: #f7f4ef;
+  --paper2: #ede9e2;
+  --paper3: #e2ddd5;
+  --line: rgba(28,26,23,0.1);
+  --line2: rgba(28,26,23,0.06);
+  --green: #2d6a4f;
+  --green-bg: #d8f3dc;
+  --red: #9b2335;
+  --red-bg: #fde8eb;
+  --blue: #1a4a7a;
+  --blue-bg: #ddeeff;
+  --amber: #7a5200;
+  --amber-bg: #fff3cd;
+  --r: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { font-size: 16px; }
+body {
+  font-family: 'Noto Serif TC', serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  padding-bottom: 120px;
+}
+/* NAV */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  padding: 0;
+}
+.nav-inner {
+  max-width: 480px; margin: 0 auto;
+  display: flex; align-items: center;
+  padding: 14px 16px 0;
+  gap: 4px;
+}
+.nav-logo { font-size: 17px; font-weight: 500; letter-spacing: 0.04em; flex: 1; }
+.nav-tabs { display: flex; gap: 0; margin-top: 10px; }
+.tab-btn {
+  flex: 1; padding: 8px 0; font-size: 13px;
+  font-family: 'Noto Serif TC', serif;
+  border: none; background: none; cursor: pointer;
+  color: var(--ink3); border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.tab-btn.active { color: var(--ink); border-bottom-color: var(--ink); }
+
+/* PAGE */
+.page { display: none; max-width: 480px; margin: 0 auto; padding: 20px 16px; }
+.page.active { display: block; }
+
+/* ADD FORM */
+.type-toggle {
+  display: flex; gap: 6px; margin-bottom: 18px;
+}
+.type-btn {
+  flex: 1; padding: 10px; border-radius: var(--r);
+  border: 1.5px solid var(--line);
+  background: none; cursor: pointer;
+  font-family: 'Noto Serif TC', serif;
+  font-size: 14px; color: var(--ink2);
+  transition: all 0.15s;
+}
+.type-btn.active-income { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.type-btn.active-transfer { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); }
+.type-btn.active-expense { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+
+.amount-row {
+  display: flex; align-items: baseline;
+  gap: 4px; margin-bottom: 18px;
+}
+.currency-sign { font-size: 22px; color: var(--ink3); font-weight: 300; }
+.amount-input {
+  flex: 1; font-size: 36px; font-family: 'DM Mono', monospace;
+  font-weight: 400; border: none; background: none;
+  color: var(--ink); outline: none; width: 100%;
+  border-bottom: 1.5px solid var(--line);
+  padding-bottom: 4px;
+}
+.amount-input::placeholder { color: var(--paper3); }
+
+.field-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 12px;
+}
+.field-full { margin-bottom: 12px; }
+.field-label {
+  font-size: 11px; color: var(--ink3);
+  letter-spacing: 0.06em; margin-bottom: 4px;
+  text-transform: uppercase;
+}
+select, input[type="text"], input[type="date"], textarea {
+  width: 100%; padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper2);
+  font-family: 'Noto Serif TC', serif;
+  font-size: 14px; color: var(--ink);
+  outline: none;
+  -webkit-appearance: none;
+  transition: border 0.15s;
+}
+select:focus, input:focus, textarea:focus {
+  border-color: var(--ink2);
+  background: #fff;
+}
+textarea { resize: none; height: 60px; line-height: 1.5; }
+
+.cc-row-check {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper2);
+  cursor: pointer;
+  font-size: 14px; color: var(--ink2);
+  margin-bottom: 12px;
+}
+.cc-row-check input { width: auto; padding: 0; }
+.cc-select-wrap { display: none; }
+.cc-select-wrap.show { display: block; margin-bottom: 12px; }
+
+.submit-btn {
+  width: 100%; padding: 14px;
+  background: var(--ink); color: var(--paper);
+  border: none; border-radius: var(--r);
+  font-family: 'Noto Serif TC', serif;
+  font-size: 15px; font-weight: 500;
+  cursor: pointer; letter-spacing: 0.06em;
+  transition: opacity 0.15s;
+  margin-top: 6px;
+}
+.submit-btn:active { opacity: 0.8; }
+
+/* RECORDS */
+.month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.month-nav button {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--line); background: none;
+  cursor: pointer; font-size: 16px; color: var(--ink2);
+  display: flex; align-items: center; justify-content: center;
+}
+.month-label { font-size: 16px; font-weight: 500; }
+
+.summary-strip {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px; margin-bottom: 20px;
+}
+.sum-card {
+  background: var(--paper2); border-radius: var(--r);
+  padding: 10px 12px; text-align: center;
+}
+.sum-lbl { font-size: 11px; color: var(--ink3); margin-bottom: 3px; }
+.sum-val { font-size: 16px; font-family: 'DM Mono', monospace; font-weight: 400; }
+.sum-val.pos { color: var(--green); }
+.sum-val.neg { color: var(--red); }
+
+.day-group { margin-bottom: 18px; }
+.day-header {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: var(--ink3);
+  padding: 0 4px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--line2);
+  padding-bottom: 4px;
+}
+.record-item {
+  display: flex; align-items: center;
+  padding: 10px 12px; margin-bottom: 4px;
+  background: var(--paper2); border-radius: var(--r);
+  gap: 10px; position: relative;
+  cursor: pointer;
+}
+.record-item:active { opacity: 0.75; }
+.rec-cat-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.rec-main { flex: 1; min-width: 0; }
+.rec-cat { font-size: 12px; color: var(--ink3); }
+.rec-note { font-size: 13px; color: var(--ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rec-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.badge {
+  font-size: 10px; padding: 1px 5px;
+  border-radius: 3px; font-family: 'DM Mono', monospace;
+}
+.badge-bank { background: var(--blue-bg); color: var(--blue); }
+.badge-cc { background: var(--amber-bg); color: var(--amber); }
+.rec-amount {
+  font-size: 15px; font-family: 'DM Mono', monospace;
+  font-weight: 400; flex-shrink: 0;
+}
+.rec-del {
+  position: absolute; right: -8px; top: -8px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--red); color: #fff;
+  border: none; font-size: 13px;
+  cursor: pointer; display: none;
+  align-items: center; justify-content: center;
+  line-height: 1;
+}
+.record-item.edit-mode .rec-del { display: flex; }
+
+/* CHART */
+.chart-section { margin-bottom: 24px; }
+.chart-title { font-size: 13px; color: var(--ink3); margin-bottom: 10px; letter-spacing: 0.04em; }
+.bar-list { }
+.bar-row {
+  display: flex; align-items: center;
+  gap: 8px; margin-bottom: 7px;
+}
+.bar-lbl { font-size: 12px; color: var(--ink2); width: 72px; flex-shrink: 0; text-align: right; }
+.bar-track { flex: 1; height: 6px; background: var(--paper3); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; background: var(--ink2); transition: width 0.4s; }
+.bar-amt { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--ink3); width: 70px; text-align: right; flex-shrink: 0; }
+
+/* EMPTY */
+.empty-state {
+  text-align: center; padding: 48px 20px;
+  color: var(--ink3); font-size: 14px; line-height: 1.8;
+}
+
+/* FAB */
+.fab {
+  position: fixed; bottom: 24px; right: 24px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--ink); color: var(--paper);
+  border: none; font-size: 26px;
+  cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s;
+  z-index: 200;
+}
+.fab:active { transform: scale(0.93); }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: var(--paper);
+  padding: 9px 18px; border-radius: 20px;
+  font-size: 13px; opacity: 0;
+  transition: opacity 0.2s; pointer-events: none;
+  z-index: 300; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* EDIT MODE BANNER */
+.edit-banner {
+  display: none;
+  background: var(--amber-bg); border: 1px solid var(--amber);
+  border-radius: var(--r); padding: 8px 12px;
+  font-size: 13px; color: var(--amber);
+  margin-bottom: 12px;
+  text-align: center;
+}
+.edit-banner.show { display: block; }
+</style>
+</head>
+<body>
+
+<div id="token-overlay" style="position:fixed;inset:0;background:var(--paper);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;">
+  <div style="max-width:360px;width:100%;text-align:center;">
+    <div style="font-size:28px;margin-bottom:1rem;">📒</div>
+    <div style="font-size:18px;font-weight:500;margin-bottom:0.5rem;">記帳本</div>
+    <div style="font-size:13px;color:var(--ink3);margin-bottom:2rem;line-height:1.7;">請輸入 Notion API Token<br>設定一次，永久儲存在這個瀏覽器</div>
+    <input type="password" id="token-input" placeholder="ntn_xxxxxxxxxxxx"
+      style="width:100%;padding:12px;border:1px solid var(--line);border-radius:var(--r);font-size:14px;font-family:'DM Mono',monospace;background:var(--paper2);margin-bottom:12px;outline:none;">
+    <button onclick="saveToken()" style="width:100%;padding:13px;background:var(--ink);color:var(--paper);border:none;border-radius:var(--r);font-family:'Noto Serif TC',serif;font-size:15px;cursor:pointer;">開始使用</button>
+    <div style="margin-top:1rem;font-size:11px;color:var(--ink3);">Token 只存在此裝置的瀏覽器，不會上傳至任何伺服器</div>
+  </div>
+</div>
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-logo">記帳本</div>
+  </div>
+  <div class="nav-inner" style="padding-top:0;">
+    <div class="nav-tabs" style="flex:1;">
+      <button class="tab-btn active" onclick="switchTab('add')">新增</button>
+      <button class="tab-btn" onclick="switchTab('records')">明細</button>
+      <button class="tab-btn" onclick="switchTab('stats')">統計</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ADD PAGE -->
+<div id="page-add" class="page active">
+  <div class="type-toggle">
+    <button class="type-btn active-expense" id="btn-expense" onclick="setType('expense')">支出</button>
+    <button class="type-btn" id="btn-income" onclick="setType('income')">收入</button>
+    <button class="type-btn" id="btn-transfer" onclick="setType('transfer')">轉帳</button>
+  </div>
+
+  <div class="amount-row">
+    <span class="currency-sign">$</span>
+    <input type="number" class="amount-input" id="inp-amount" placeholder="0" inputmode="decimal" step="1">
+  </div>
+
+  <div class="field-row">
+    <div>
+      <div class="field-label">分類</div>
+      <select id="inp-cat"></select>
+    </div>
+    <div>
+      <div class="field-label">日期</div>
+      <input type="date" id="inp-date">
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div>
+      <div class="field-label">帳戶</div>
+      <select id="inp-account">
+        <option value="永豐銀行">永豐銀行</option>
+        <option value="元大銀行">元大銀行</option>
+        <option value="國泰銀行">國泰銀行</option>
+        <option value="中信銀行">中信銀行</option>
+        <option value="台新銀行">台新銀行</option>
+        <option value="LineBank">LineBank</option>
+        <option value="樂天銀行">樂天銀行</option>
+        <option value="現金">現金</option>
+      </select>
+    </div>
+    <div>
+      <div class="field-label">信用卡</div>
+      <select id="inp-cc" onchange="autofillAccount()">
+        <option value="">無（直接扣款）</option>
+        <option value="永豐卡">永豐卡</option>
+        <option value="國泰卡">國泰卡</option>
+        <option value="中信卡">中信卡</option>
+        <option value="台新卡">台新卡</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field-full">
+    <div class="field-label">備註</div>
+    <textarea id="inp-note" placeholder="選填，例如：7-11 午餐、油費"></textarea>
+  </div>
+
+  <div id="transfer-fields" style="display:none">
+    <div class="field-full">
+      <div class="field-label">轉入帳戶</div>
+      <select id="inp-account-to">
+        <option value="永豐銀行">永豐銀行</option>
+        <option value="元大銀行">元大銀行</option>
+        <option value="國泰銀行">國泰銀行</option>
+        <option value="中信銀行">中信銀行</option>
+        <option value="台新銀行">台新銀行</option>
+        <option value="LineBank">LineBank</option>
+        <option value="樂天銀行">樂天銀行</option>
+        <option value="現金">現金</option>
+      </select>
+    </div>
+  </div>
+  <button class="submit-btn" onclick="addRecord()">記下來</button>
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <button onclick="loadAndRender()" style="flex:1;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:none;font-family:'Noto Serif TC',serif;font-size:13px;color:var(--ink2);cursor:pointer;">↻ 重新同步 Notion</button>
+  </div>
+</div>
+
+<!-- RECORDS PAGE -->
+<div id="page-records" class="page">
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">‹</button>
+    <div class="month-label" id="month-label"></div>
+    <button onclick="changeMonth(1)">›</button>
+  </div>
+  <div class="summary-strip" id="summary-strip"></div>
+  <div class="edit-banner" id="edit-banner">點記錄可刪除　再點一次結束</div>
+  <div id="records-list"></div>
+  <button style="width:100%;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:none;font-family:'Noto Serif TC',serif;font-size:13px;color:var(--ink3);cursor:pointer;margin-top:8px;" onclick="toggleEditMode()">
+    <span id="edit-btn-label">整理模式（長按刪除）</span>
+  </button>
+</div>
+
+<!-- STATS PAGE -->
+<div id="page-stats" class="page">
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">‹</button>
+    <div class="month-label" id="stats-month-label"></div>
+    <button onclick="changeMonth(1)">›</button>
+  </div>
+  <div id="stats-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CATS = {
+  expense: ['餐飲','交通','購物','娛樂','醫療','保險','投資','房租','水電費','通訊','教育','貸款還款','其他支出'],
+  income:  ['薪資','副業（魚樂匯）','投資收益','利息','其他收入']
+};
+const CAT_COLORS = {
+  '餐飲':'#c9765a','交通':'#5a8fc9','購物':'#c95a8f','娛樂':'#9c5ac9',
+  '醫療':'#5ac9a8','保險':'#c9a85a','投資':'#5a6fc9','房租':'#8f5ac9',
+  '水電費':'#5ab0c9','通訊':'#c9c95a','教育':'#5ac96f','其他支出':'#8a8780',
+  '薪資':'#2d6a4f','副業（魚樂匯）':'#4f7a2d','投資收益':'#2d4f7a',
+  '利息':'#7a4f2d','其他收入':'#4f2d7a'
+};
+
+const DATABASE_ID = '3635a542150880449d36d00b3623eda2';
+let NOTION_TOKEN = localStorage.getItem('kk_notion_token') || '';
+let records = [];
+let notionLoading = false;
+let currentType = 'expense';
+let viewYear, viewMonth;
+let editMode = false;
+
+function exportData() {
+  const data = { records, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '記帳本備份_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  showToast('✓ 備份已匯出');
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data.records)) throw new Error();
+      if (!confirm('匯入後會覆蓋現有資料（' + records.length + ' 筆），確定？')) return;
+      records = data.records;
+      save();
+      renderRecords();
+      renderStats();
+      showToast('✓ 匯入成功，共 ' + records.length + ' 筆');
+    } catch {
+      showToast('檔案格式錯誤');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function saveToken() {
+  const t = document.getElementById('token-input').value.trim();
+  if (!t.startsWith('ntn_') && !t.startsWith('secret_')) { alert('Token 格式不正確，請重新複製'); return; }
+  NOTION_TOKEN = t;
+  localStorage.setItem('kk_notion_token', t);
+  document.getElementById('token-overlay').style.display = 'none';
+  loadAndRender();
+}
+
+async function loadAndRender() {
+  showToast('載入中…');
+  try {
+    records = await loadFromNotion();
+    showToast('✓ 已載入 ' + records.length + ' 筆');
+  } catch(e) {
+    showToast('⚠ 載入失敗：' + e.message);
+  }
+  renderRecords();
+  renderStats();
+}
+
+async function init() {
+  const now = new Date();
+  viewYear = now.getFullYear();
+  viewMonth = now.getMonth();
+  document.getElementById('inp-date').value = now.toISOString().slice(0,10);
+  updateCats();
+  if (!NOTION_TOKEN) {
+    document.getElementById('token-overlay').style.display = 'flex';
+    return;
+  }
+  await loadAndRender();
+}
+
+async function saveToNotion(rec) {
+  const props = {
+    '備註': { title: [{ text: { content: rec.note || '' } }] },
+    '類型': { select: { name: rec.type === 'income' ? '收入' : rec.type === 'transfer' ? '轉帳' : '支出' } },
+    '金額': { number: rec.amount },
+    '分類': { select: { name: rec.category || '' } },
+    '帳戶': { select: { name: rec.account || '' } },
+    '日期': { date: { start: rec.date } }
+  };
+  if (rec.cc) props['信用卡'] = { select: { name: rec.cc } };
+  if (rec.accountTo) props['轉入帳戶'] = { select: { name: rec.accountTo } };
+  const res = await fetch('https://api.notion.com/v1/pages', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + NOTION_TOKEN,
+      'Content-Type': 'application/json',
+      'Notion-Version': '2022-06-28'
+    },
+    body: JSON.stringify({ parent: { database_id: DATABASE_ID }, properties: props })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Notion error');
+  return data.id;
+}
+
+async function deleteFromNotion(notionId) {
+  await fetch('https://api.notion.com/v1/pages/' + notionId, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': 'Bearer ' + NOTION_TOKEN,
+      'Content-Type': 'application/json',
+      'Notion-Version': '2022-06-28'
+    },
+    body: JSON.stringify({ archived: true })
+  });
+}
+
+async function loadFromNotion() {
+  let all = [], cursor = undefined;
+  while (true) {
+    const body = { page_size: 100, sorts: [{ property: '日期', direction: 'descending' }] };
+    if (cursor) body.start_cursor = cursor;
+    const res = await fetch('https://api.notion.com/v1/databases/' + DATABASE_ID + '/query', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + NOTION_TOKEN,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Notion error');
+    data.results.forEach(p => {
+      const pr = p.properties;
+      const typeMap = { '收入': 'income', '轉帳': 'transfer', '支出': 'expense' };
+      all.push({
+        id: p.id,
+        notionId: p.id,
+        type: typeMap[pr['類型']?.select?.name] || 'expense',
+        amount: pr['金額']?.number || 0,
+        category: pr['分類']?.select?.name || '',
+        date: pr['日期']?.date?.start || '',
+        account: pr['帳戶']?.select?.name || '',
+        accountTo: pr['轉入帳戶']?.select?.name || '',
+        cc: pr['信用卡']?.select?.name || '',
+        note: pr['備註']?.title?.[0]?.plain_text || ''
+      });
+    });
+    if (!data.has_more) break;
+    cursor = data.next_cursor;
+  }
+  return all;
+}
+
+function save() {}
+
+const CC_BANK_MAP = {
+  '永豐卡': '永豐銀行',
+  '國泰卡': '國泰銀行',
+  '中信卡': '中信銀行',
+  '台新卡': '台新銀行'
+};
+function autofillAccount() {
+  const cc = document.getElementById('inp-cc').value;
+  if (!cc) return;
+  const bank = CC_BANK_MAP[cc];
+  if (!bank) return;
+  const sel = document.getElementById('inp-account');
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === bank) { sel.selectedIndex = i; break; }
+  }
+  showToast('帳戶已自動帶入 ' + bank);
+}
+
+function setType(t) {
+  currentType = t;
+  document.getElementById('btn-expense').className = t==='expense' ? 'type-btn active-expense' : 'type-btn';
+  document.getElementById('btn-income').className  = t==='income'  ? 'type-btn active-income'  : 'type-btn';
+  document.getElementById('btn-transfer').className = t==='transfer' ? 'type-btn active-transfer' : 'type-btn';
+  const isTransfer = t === 'transfer';
+  document.getElementById('transfer-fields').style.display = isTransfer ? 'block' : 'none';
+  document.getElementById('inp-cc').parentElement.parentElement.style.display = isTransfer ? 'none' : '';
+  updateCats();
+}
+
+function updateCats() {
+  const sel = document.getElementById('inp-cat');
+  const list = CATS[currentType] || [];
+  sel.innerHTML = list.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.parentElement.parentElement.style.display = currentType === 'transfer' ? 'none' : '';
+}
+
+async function addRecord() {
+  const amt = parseFloat(document.getElementById('inp-amount').value);
+  if (!amt || amt <= 0) { showToast('請輸入金額'); return; }
+  const isTransfer = currentType === 'transfer';
+  const rec = {
+    id: Date.now(),
+    type: currentType,
+    amount: amt,
+    category: isTransfer ? '轉帳' : document.getElementById('inp-cat').value,
+    date: document.getElementById('inp-date').value,
+    account: document.getElementById('inp-account').value,
+    accountTo: isTransfer ? document.getElementById('inp-account-to').value : '',
+    cc: isTransfer ? '' : document.getElementById('inp-cc').value,
+    note: document.getElementById('inp-note').value.trim()
+  };
+  if (isTransfer && rec.account === rec.accountTo) { showToast('轉出與轉入帳戶相同'); return; }
+  const btn = document.querySelector('.submit-btn');
+  btn.textContent = '儲存中…'; btn.disabled = true;
+  try {
+    const notionId = await saveToNotion(rec);
+    rec.notionId = notionId;
+    records.unshift(rec);
+    document.getElementById('inp-amount').value = '';
+    document.getElementById('inp-note').value = '';
+    showToast('✓ 已同步至 Notion');
+    renderRecords(); renderStats();
+  } catch(e) {
+    showToast('⚠ 儲存失敗：' + e.message);
+  } finally {
+    btn.textContent = '記下來'; btn.disabled = false;
+  }
+}
+
+async function deleteRecord(id) {
+  if (!confirm('確定刪除？')) return;
+  const rec = records.find(r => r.id === id);
+  if (rec && rec.notionId) {
+    try { await deleteFromNotion(rec.notionId); } catch(e) { showToast('刪除失敗：' + e.message); return; }
+  }
+  records = records.filter(r => r.id !== id);
+  renderRecords(); renderStats();
+}
+
+function changeMonth(d) {
+  viewMonth += d;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  if (viewMonth < 0)  { viewMonth = 11; viewYear--; }
+  renderRecords();
+  renderStats();
+}
+
+function monthStr() {
+  return `${viewYear} 年 ${viewMonth+1} 月`;
+}
+
+function renderRecords() {
+  document.getElementById('month-label').textContent = monthStr();
+  const recs = records.filter(r => {
+    const d = new Date(r.date);
+    return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+  });
+
+  const income  = recs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+  const expense = recs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+  const net = income - expense;
+
+  document.getElementById('summary-strip').innerHTML = `
+    <div class="sum-card">
+      <div class="sum-lbl">收入</div>
+      <div class="sum-val pos">${fmt(income)}</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-lbl">支出</div>
+      <div class="sum-val neg">${fmt(expense)}</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-lbl">結餘</div>
+      <div class="sum-val ${net>=0?'pos':'neg'}">${fmt(net)}</div>
+    </div>
+  `;
+
+  if (recs.length === 0) {
+    document.getElementById('records-list').innerHTML = '<div class="empty-state">這個月還沒有記錄<br>點「新增」開始記帳</div>';
+    return;
+  }
+
+  const byDay = {};
+  recs.forEach(r => {
+    if (!byDay[r.date]) byDay[r.date] = [];
+    byDay[r.date].push(r);
+  });
+
+  const days = Object.keys(byDay).sort((a,b) => b.localeCompare(a));
+  let html = '';
+  days.forEach(day => {
+    const dayRecs = byDay[day];
+    const dayDate = new Date(day + 'T00:00:00');
+    const weekDays = ['日','一','二','三','四','五','六'];
+    const dayLabel = `${dayDate.getMonth()+1}/${dayDate.getDate()} 週${weekDays[dayDate.getDay()]}`;
+    const dayNet = dayRecs.reduce((s,r) => r.type==='transfer'? s : r.type==='income'? s+r.amount : s-r.amount, 0);
+
+    html += `<div class="day-group">
+      <div class="day-header">
+        <span>${dayLabel}</span>
+        <span style="font-family:'DM Mono',monospace;color:${dayNet>=0?'var(--green)':'var(--red)'}">${dayNet>=0?'+':''}${fmt(dayNet)}</span>
+      </div>`;
+
+    dayRecs.forEach(r => {
+      const col = CAT_COLORS[r.category] || '#8a8780';
+      const isTransfer = r.type === 'transfer';
+      const amtStr = isTransfer ? '⇄ ' + fmt(r.amount) : (r.type==='income'?'+':'-') + fmt(r.amount);
+      const amtCol = isTransfer ? 'var(--blue)' : r.type==='income' ? 'var(--green)' : 'var(--ink)';
+      html += `
+        <div class="record-item ${editMode?'edit-mode':''}" id="rec-${r.id}" onclick="recClick(${r.id})">
+          <div class="rec-cat-dot" style="background:${col}"></div>
+          <div class="rec-main">
+            <div class="rec-cat">${r.category}</div>
+            <div class="rec-note">${r.note || r.account}</div>
+            <div class="rec-badges">
+              <span class="badge badge-bank">${r.account}</span>
+              ${r.cc ? `<span class="badge badge-cc">${r.cc}</span>` : ''}
+            </div>
+          </div>
+          <div class="rec-amount" style="color:${amtCol}">${amtStr}</div>
+          <button class="rec-del" onclick="event.stopPropagation();deleteRecord(${r.id})">×</button>
+        </div>`;
+    });
+    html += '</div>';
+  });
+  document.getElementById('records-list').innerHTML = html;
+}
+
+function recClick(id) {
+  if (editMode) deleteRecord(id);
+}
+
+function toggleEditMode() {
+  editMode = !editMode;
+  document.getElementById('edit-banner').className = editMode ? 'edit-banner show' : 'edit-banner';
+  document.getElementById('edit-btn-label').textContent = editMode ? '結束整理模式' : '整理模式（長按刪除）';
+  renderRecords();
+}
+
+function renderStats() {
+  document.getElementById('stats-month-label').textContent = monthStr();
+  const recs = records.filter(r => {
+    const d = new Date(r.date);
+    return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+  });
+  const expenses = recs.filter(r => r.type==='expense');
+  const incomes  = recs.filter(r => r.type==='income');
+
+  if (recs.length === 0) {
+    document.getElementById('stats-content').innerHTML = '<div class="empty-state">這個月還沒有記錄</div>';
+    return;
+  }
+
+  const expByCat = {};
+  expenses.forEach(r => { expByCat[r.category] = (expByCat[r.category]||0) + r.amount; });
+  const incByCat = {};
+  incomes.forEach(r => { incByCat[r.category] = (incByCat[r.category]||0) + r.amount; });
+
+  const ccAmts = {};
+  expenses.filter(r=>r.cc).forEach(r => { ccAmts[r.cc] = (ccAmts[r.cc]||0) + r.amount; });
+
+  let html = '';
+
+  // Expense breakdown
+  const expTotal = expenses.reduce((s,r)=>s+r.amount,0);
+  if (expenses.length) {
+    html += `<div class="chart-section"><div class="chart-title">支出分類</div><div class="bar-list">`;
+    Object.entries(expByCat).sort((a,b)=>b[1]-a[1]).forEach(([cat,amt]) => {
+      const pct = expTotal > 0 ? (amt/expTotal*100).toFixed(0) : 0;
+      const col = CAT_COLORS[cat] || '#8a8780';
+      html += `<div class="bar-row">
+        <div class="bar-lbl">${cat}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="bar-amt">${fmt(amt)}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // Income breakdown
+  const incTotal = incomes.reduce((s,r)=>s+r.amount,0);
+  if (incomes.length) {
+    html += `<div class="chart-section"><div class="chart-title">收入來源</div><div class="bar-list">`;
+    Object.entries(incByCat).sort((a,b)=>b[1]-a[1]).forEach(([cat,amt]) => {
+      const pct = incTotal > 0 ? (amt/incTotal*100).toFixed(0) : 0;
+      const col = CAT_COLORS[cat] || '#2d6a4f';
+      html += `<div class="bar-row">
+        <div class="bar-lbl">${cat}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="bar-amt">${fmt(amt)}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // CC summary
+  if (Object.keys(ccAmts).length) {
+    html += `<div class="chart-section"><div class="chart-title">信用卡刷卡金額</div>`;
+    Object.entries(ccAmts).sort((a,b)=>b[1]-a[1]).forEach(([cc,amt]) => {
+      html += `<div class="bar-row">
+        <div class="bar-lbl">${cc}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--amber)"></div></div>
+        <div class="bar-amt">${fmt(amt)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Account usage
+  const accAmts = {};
+  expenses.forEach(r => { accAmts[r.account] = (accAmts[r.account]||0) + r.amount; });
+  if (Object.keys(accAmts).length) {
+    const accTotal = Object.values(accAmts).reduce((s,v)=>s+v,0);
+    html += `<div class="chart-section"><div class="chart-title">帳戶支出分布</div><div class="bar-list">`;
+    Object.entries(accAmts).sort((a,b)=>b[1]-a[1]).forEach(([acc,amt]) => {
+      const pct = accTotal > 0 ? (amt/accTotal*100).toFixed(0) : 0;
+      html += `<div class="bar-row">
+        <div class="bar-lbl">${acc}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--blue)"></div></div>
+        <div class="bar-amt">${fmt(amt)}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  document.getElementById('stats-content').innerHTML = html;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'records') renderRecords();
+  if (tab === 'stats') renderStats();
+}
+
+function fmt(n) {
+  return Math.abs(n) >= 1000
+    ? (n/1000).toFixed(1).replace(/\.0$/,'') + 'K'
+    : Math.round(n).toString();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+init();
+</script>
+</body>
+</html>
