@@ -465,7 +465,7 @@ textarea { resize: none; height: 60px; line-height: 1.5; }
 
 <script>
 const CATS = {
-  expense: ['餐飲','交通','購物','娛樂','醫療','保險','投資','房租','水電費','通訊','教育','貸款還款','其他支出'],
+  expense: ['餐飲','交通','購物','娛樂','醫療','保險','投資','房租','水電費','通訊','教育','信用卡還款','貸款還款','其他支出'],
   income:  ['薪資','副業（魚樂匯）','投資收益','利息','其他收入']
 };
 const CAT_COLORS = {
@@ -719,6 +719,7 @@ function parseRow(obj, config) {
 
   // Auto-guess category and type
   let category = type === 'income' ? '其他收入' : '其他支出';
+  let excluded = false;
   const d = desc + ' ' + note;
 
   // 跨行轉入/轉出、匯款、CD轉入 → 轉帳（資金調度，不是真正收支）
@@ -727,14 +728,18 @@ function parseRow(obj, config) {
     category = '轉帳';
   }
   else if (d.match(/薪|工資|salary/i)) category = '薪資';
-  else if (d.match(/卡費|信用卡|card|媒體轉帳.*卡/i)) { type = 'expense'; category = '貸款還款'; }
+  else if (d.match(/信用卡款|卡費扣繳|媒體轉帳.*卡費|帳單.*扣款/i)) {
+    // 銀行扣繳信用卡帳單 = 轉帳性質，標記為略過避免重複計算
+    type = 'transfer'; category = '轉帳'; excluded = true;
+  }
+  else if (d.match(/卡費|信用卡|card/i)) { type = 'expense'; category = '信用卡還款'; }
   else if (d.match(/利息|存款息|interest|回饋/i)) { type = 'income'; category = '利息'; }
   else if (d.match(/保險|insurance/i)) { type = 'expense'; category = '保險'; }
   else if (d.match(/房貸|信貸|貸款|loan/i)) { type = 'expense'; category = '貸款還款'; }
   else if (d.match(/手續費/i)) { type = 'expense'; category = '其他支出'; }
 
   // 轉帳類型不需要 accountTo 先留空，讓使用者自己補
-  return { date, amount, type, category, account: config.account, cc: '', note: note || desc, desc, excluded: false };
+  return { date, amount, type, category, account: config.account, cc: '', note: note || desc, desc, excluded };
 }
 
 function renderImportPreview() {
@@ -757,7 +762,7 @@ function renderImportPreview() {
         <div>
           <div class="field-label" style="margin-bottom:3px;">分類</div>
           <select onchange="updateImportRow(${i},'category',this.value)">
-            ${(row.type==='income' ? ['薪資','副業（魚樂匯）','投資收益','利息','其他收入'] : row.type==='transfer' ? ['轉帳'] : ['餐飲','交通','購物','娛樂','醫療','保險','投資','房租','水電費','通訊','教育','貸款還款','其他支出']).map(c => `<option value="${c}" ${c===row.category?'selected':''}>${c}</option>`).join('')}
+            ${(row.type==='income' ? ['薪資','副業（魚樂匯）','投資收益','利息','其他收入'] : row.type==='transfer' ? ['轉帳'] : ['餐飲','交通','購物','娛樂','醫療','保險','投資','房租','水電費','通訊','教育','信用卡還款','貸款還款','其他支出']).map(c => `<option value="${c}" ${c===row.category?'selected':''}>${c}</option>`).join('')}
           </select>
         </div>
         <div>
